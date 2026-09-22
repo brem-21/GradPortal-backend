@@ -1,0 +1,41 @@
+services:
+  db:
+    # pgvector image, not plain postgres: the AI services store embeddings
+    # in a vector(1536) column and need the extension available.
+    image: pgvector/pgvector:pg16
+    container_name: gradportal-db
+    environment:
+      POSTGRES_USER: gradportal
+      POSTGRES_PASSWORD: gradportal
+      POSTGRES_DB: gradportal
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gradportal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: gradportal-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Local SMTP catcher: UI at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: gradportal-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  postgres-data:
