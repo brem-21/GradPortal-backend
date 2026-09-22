@@ -59,7 +59,12 @@ check "internal needs svc token" 403 "http://127.0.0.1:8001/internal/search" \
 
 echo
 echo "── dev sign-in as $EMAIL ──────────────────────────────────"
-CSRF=$(curl -s -c "$JAR" --max-time 20 "$WEB/api/auth/csrf" \
+# A Next dev server compiles each route on first hit, which can take far
+# longer than a normal request. Warm the auth route before timing anything,
+# or a cold compile reads as an unreachable server and every page after it
+# fails for want of a session.
+curl -s -o /dev/null --max-time 120 "$WEB/api/auth/csrf" 2>/dev/null || true
+CSRF=$(curl -s -c "$JAR" --max-time 60 "$WEB/api/auth/csrf" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['csrfToken'])" 2>/dev/null)
 if [ -z "${CSRF:-}" ]; then
   bad "csrf token" "could not reach $WEB"
@@ -77,11 +82,11 @@ echo
 echo "── authenticated pages ────────────────────────────────────"
 for route in /overview /opportunities /shortlist /dossier /committee \
              /mentors /mentorship /profile /settings /notifications; do
-  body=$(curl -s -b "$JAR" --max-time 60 "$WEB$route")
+  body=$(curl -s -b "$JAR" --max-time 120 "$WEB$route")
   if printf '%s' "$body" | grep -q "Application error\|Internal Server Error\|Backend unreachable"; then
     bad "$route" "rendered an error"
   elif [ ${#body} -lt 2000 ]; then
-    bad "$route" "suspiciously small response (${#body} bytes)"
+    bad "$route" "${#body} bytes — this is a redirect body, so the session is missing"
   else
     ok "$route"
   fi
@@ -90,7 +95,7 @@ done
 echo
 echo "── admin pages ────────────────────────────────────────────"
 for route in /admin/sources /admin/media /admin/stories /submit; do
-  code=$(curl -s -b "$JAR" -o /dev/null -w '%{http_code}' --max-time 45 "$WEB$route")
+  code=$(curl -s -b "$JAR" -o /dev/null -w '%{http_code}' --max-time 120 "$WEB$route")
   if [ "$code" = "200" ]; then ok "$route"
   elif [ "$code" = "307" ]; then warn "$route" "redirected — this account is not an admin"
   else bad "$route" "got $code"; fi

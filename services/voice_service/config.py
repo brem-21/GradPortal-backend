@@ -4,19 +4,21 @@ from shared.config import BaseServiceSettings
 
 
 class VoiceSettings(BaseServiceSettings):
+    """Speech-to-text only.
+
+    Text-to-speech was removed: ElevenLabs refuses library voices on the free
+    tier, and a "Listen" control that can only ever error is worse than no
+    control at all. Transcription works on every plan.
+    """
+
     service_name: str = "voice-service"
     port: int = 8004
 
     elevenlabs_api_key: str = ""
     elevenlabs_base_url: str = "https://api.elevenlabs.io/v1"
     elevenlabs_stt_model: str = "scribe_v1"
-    # Turbo: the latency difference is what makes a spoken reply feel like a
-    # conversation rather than a download.
-    elevenlabs_tts_model: str = "eleven_turbo_v2_5"
-    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"
 
     max_audio_bytes: int = 25 * 1024 * 1024
-    max_tts_characters: int = 2500
 
 
 @lru_cache

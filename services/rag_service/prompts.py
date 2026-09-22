@@ -31,10 +31,7 @@ STYLE:
 - When the answer is a list drawn from documents, use a short bulleted list.
 - Never open with "Based on the provided documents" — just answer.
 
-{voice_hint}"""
-
-
-VOICE_HINT = """This answer will be spoken aloud, so: no markdown, no bullet characters, no bracket-heavy prose. Keep it under about 120 words, in complete sentences a person can follow by ear. Still cite with [1] style markers — they are stripped before speech but kept in the transcript."""
+"""
 
 
 WEB_ENABLED = """

@@ -75,14 +75,14 @@ class ChatRequest(BaseModel):
     conversation_id: uuid.UUID | None = None
     # Routes to the reasoning model instead of the fast one.
     reasoning: bool = False
-    # Shapes the answer for text-to-speech and marks the turn as voice-originated.
-    voice: bool = False
     # Live web search for this turn. Opt-in: it costs roughly 3500x a plain call.
     web: bool = False
     # Ground the answer in the user's own dossier. On by default — answering
     # from someone's own documents is the point of the feature, and making
     # them opt in every time would be a tax on the common case.
     use_documents: bool = True
+    # How the question arrived. Recorded on the turn; it no longer changes
+    # the answer, since there is no text-to-speech to shape it for.
     input_mode: str = "text"
     document_ids: list[uuid.UUID] = Field(default_factory=list)
     # Pins the conversation to one posting so every turn has it in context.

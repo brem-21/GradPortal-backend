@@ -26,7 +26,6 @@ from rag_service.prompts import (
     OPPORTUNITY_CONTEXT,
     QUERY_PLANNER,
     TITLE_PROMPT,
-    VOICE_HINT,
     WEB_ENABLED,
     WEB_ONLY,
     build_context_block,
@@ -253,7 +252,6 @@ def build_messages(
     question: str,
     conversation: Conversation,
     outcome: RetrievalOutcome,
-    voice: bool,
     web: bool = False,
     opportunity: dict | None = None,
     use_documents: bool = True,
@@ -316,7 +314,7 @@ def build_messages(
         )
 
     hits = _trim_to_budget(outcome.hits, settings.max_context_chars)
-    system = GROUNDED_ANSWER.format(voice_hint=VOICE_HINT if voice else "")
+    system = GROUNDED_ANSWER
     if web:
         system += WEB_ENABLED
     system += context_suffix
@@ -341,7 +339,6 @@ async def answer(
     conversation: Conversation,
     outcome: RetrievalOutcome,
     reasoning: bool,
-    voice: bool,
     web: bool = False,
     opportunity: dict | None = None,
     use_documents: bool = True,
@@ -351,7 +348,6 @@ async def answer(
         question=question,
         conversation=conversation,
         outcome=outcome,
-        voice=voice,
         web=web,
         opportunity=opportunity,
         use_documents=use_documents,
@@ -361,7 +357,7 @@ async def answer(
         messages,
         reasoning=reasoning,
         temperature=0.2,
-        max_tokens=1200 if voice else 2000,
+        max_tokens=2000,
         web_search=web,
     )
 

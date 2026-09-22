@@ -14,7 +14,7 @@ voice-or-text assistant grounded in those documents.
 | **doc-service** | 8001 | Uploads, parsing, chunking, embeddings, vector retrieval | `docs` |
 | **rag-service** | 8002 | Agentic RAG chat over the user's own documents | `rag` |
 | **eval-service** | 8003 | Admissions-committee document review | `evaluation` |
-| **voice-service** | 8004 | ElevenLabs speech-to-text and text-to-speech | none (stateless) |
+| **voice-service** | 8004 | ElevenLabs speech-to-text | none (stateless) |
 | **frontend** | 3000 | Next.js 15 App Router, Aker design system | — |
 
 Each service owns one Postgres schema and never reads another's tables. They share a
@@ -132,7 +132,7 @@ Postgres is on **5437**, not 5432, to avoid colliding with other local projects.
 | Key | Needed by | What breaks without it |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | doc, rag, eval | Everything AI: indexing, Counsel and the Committee. **One key covers all three** — embeddings included. |
-| `ELEVENLABS_API_KEY` | voice-service | No speech input, no spoken replies. Text still works. |
+| `ELEVENLABS_API_KEY` | voice-service | No speech input. Typing still works. |
 | `INTERNAL_SERVICE_TOKEN` | all services | `/internal/*` routes refuse every caller. |
 | `OPENAI_API_KEY` | doc-service | Optional. Set it only to bill embeddings to OpenAI directly instead of through OpenRouter. |
 
@@ -357,9 +357,12 @@ documents do not cover the question it says so and names what is missing rather 
 answering from general knowledge. The UI shows the queries it ran and the excerpts it
 used, so retrieval is inspectable.
 
-Voice is both directions: ElevenLabs Scribe for speech-to-text, and TTS for spoken
-replies. Answers destined for speech are shaped for the ear and stripped of markdown
-and citation markers before synthesis, while the transcript keeps them.
+Voice is input only: ElevenLabs Scribe transcribes the question, and the text
+then travels the same path as anything typed. Text-to-speech was removed —
+ElevenLabs refuses library voices on the free tier, so a "Listen" control could
+only ever error, and a control that cannot work is worse than no control.
+Re-adding it is a small job if you move to a paid plan: the synthesis call and
+its streaming route are the only pieces that were deleted.
 
 ---
 
@@ -475,9 +478,9 @@ outside `ENVIRONMENT=development`.
 
 ## Known limits
 
-- **Text-to-speech needs a paid ElevenLabs plan.** Free accounts cannot use library
-  voices through the API (`paid_plan_required`). Speech-to-text works on free. The
-  service surfaces the real provider message rather than a generic failure.
+- **Voice is input only.** Speech-to-text works on every ElevenLabs plan;
+  text-to-speech was removed because free accounts cannot use library voices
+  through the API (`paid_plan_required`).
 - **LinkedIn sign-in only enriches name, picture and locale.** Both Google and
   LinkedIn implement plain OpenID Connect, which carries exactly that. Headline,
   positions and education require LinkedIn's `r_basicprofile` product, which is

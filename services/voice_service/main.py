@@ -12,8 +12,8 @@ app = FastAPI(
     title="GradPortal · Voice Service",
     version="0.1.0",
     description=(
-        "ElevenLabs speech-to-text and text-to-speech. Stateless: it holds the "
-        "vendor key and never touches conversation or document data."
+        "ElevenLabs speech-to-text. Stateless: it holds the vendor key and "
+        "never touches conversation or document data."
     ),
 )
 
@@ -39,8 +39,5 @@ def health() -> dict:
             "api": "ok",
             "elevenlabs": "configured" if configured else "missing ELEVENLABS_API_KEY",
         },
-        "models": {
-            "stt": settings.elevenlabs_stt_model,
-            "tts": settings.elevenlabs_tts_model,
-        },
+        "models": {"stt": settings.elevenlabs_stt_model},
     }

@@ -2,25 +2,6 @@ import pytest
 
 from shared.errors import UpstreamError
 from shared.llm import extract_json
-from voice_service.elevenlabs import strip_for_speech
-
-
-class TestStripForSpeech:
-    def test_removes_citation_markers(self):
-        assert "[1]" not in strip_for_speech("Your CV lists Spark [1] and Airflow [2].")
-
-    def test_removes_markdown_emphasis_and_bullets(self):
-        out = strip_for_speech("**Strong** points:\n- `Spark`\n- Airflow")
-        assert "*" not in out and "`" not in out and "- " not in out
-
-    def test_collapses_newlines_into_sentences(self):
-        out = strip_for_speech("First point.\n\nSecond point.")
-        assert "\n" not in out
-        assert "First point" in out and "Second point" in out
-
-    def test_leaves_plain_prose_alone(self):
-        text = "Your statement names three supervisors but gives a reason for only one."
-        assert strip_for_speech(text) == text
 
 
 class TestExtractJson:
@@ -38,3 +19,23 @@ class TestExtractJson:
     def test_raises_when_there_is_no_json(self):
         with pytest.raises(UpstreamError, match="did not return JSON"):
             extract_json("I could not complete this review.")
+
+
+class TestAudioAcceptance:
+    """Speech-to-text is the only ElevenLabs feature that remains."""
+
+    def test_accepts_what_browsers_actually_record(self):
+        from voice_service.elevenlabs import ACCEPTED_AUDIO
+
+        # Chrome's MediaRecorder emits webm (sometimes labelled video/webm),
+        # Safari emits mp4.
+        for content_type in ("audio/webm", "video/webm", "audio/mp4", "audio/mpeg"):
+            assert content_type in ACCEPTED_AUDIO, content_type
+
+    def test_text_to_speech_is_gone(self):
+        import voice_service.elevenlabs as module
+
+        # It was removed rather than disabled: a "Listen" control that can only
+        # error on the free tier is worse than no control.
+        assert not hasattr(module, "synthesise")
+        assert not hasattr(module, "list_voices")

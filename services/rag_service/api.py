@@ -83,9 +83,7 @@ async def chat(
         role=Role.USER,
         content=question,
         input_mode=(
-            InputMode.VOICE
-            if payload.voice or payload.input_mode == InputMode.VOICE
-            else InputMode.TEXT
+            InputMode.VOICE if payload.input_mode == InputMode.VOICE else InputMode.TEXT
         ),
     )
     db.add(user_message)
@@ -108,7 +106,6 @@ async def chat(
         conversation=conversation,
         outcome=outcome,
         reasoning=payload.reasoning,
-        voice=payload.voice,
         web=payload.web,
         opportunity=payload.opportunity,
         use_documents=payload.use_documents,
@@ -352,7 +349,7 @@ async def chat_stream(
                 content=question,
                 input_mode=(
                     InputMode.VOICE
-                    if payload.voice or payload.input_mode == InputMode.VOICE
+                    if payload.input_mode == InputMode.VOICE
                     else InputMode.TEXT
                 ),
             )
@@ -377,7 +374,6 @@ async def chat_stream(
                 question=question,
                 conversation=conversation,
                 outcome=outcome,
-                voice=payload.voice,
                 web=payload.web,
                 opportunity=payload.opportunity,
                 use_documents=payload.use_documents,
@@ -422,7 +418,7 @@ async def chat_stream(
                     messages,
                     reasoning=payload.reasoning,
                     temperature=0.2,
-                    max_tokens=1200 if payload.voice else 2000,
+                    max_tokens=2000,
                     web_search=payload.web,
                 ):
                     kind = event.get("type")
