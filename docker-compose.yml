@@ -1,3 +1,7 @@
+# Project and volume names are pinned, not derived from the directory name:
+# moving or renaming the checkout must never orphan the database volume.
+name: gradportal
+
 services:
   db:
     # pgvector image, not plain postgres: the AI services store embeddings
@@ -39,3 +43,4 @@ services:
 
 volumes:
   postgres-data:
+    name: gradportal-postgres-data
