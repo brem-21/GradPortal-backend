@@ -72,6 +72,23 @@ class HTMLListingAdapter(SourceAdapter):
             # Some catalogues mix undergraduate and graduate study in one list.
             # Excluding by title is cheaper and more reliable than trying to
             # infer the level from a page we have not fetched yet.
+            # Some pages reuse the programme-card class for a news block. When
+            # the catalogue names degrees consistently, requiring the degree
+            # word is more robust than excluding each kind of stray item.
+            requires = config.get("title_require") or []
+            if requires:
+                pattern = re.compile("|".join(requires), re.IGNORECASE)
+                before = len(result.opportunities)
+                result.opportunities = [
+                    item for item in result.opportunities if pattern.search(item.title)
+                ]
+                if before != len(result.opportunities):
+                    log.info(
+                        "dropped_missing_required_title",
+                        source=source.slug,
+                        dropped=before - len(result.opportunities),
+                    )
+
             excludes = config.get("title_exclude") or []
             if excludes:
                 pattern = re.compile("|".join(excludes), re.IGNORECASE)

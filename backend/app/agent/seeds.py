@@ -185,13 +185,10 @@ SEED_SOURCES: list[dict] = [
             "organization": "Georgia Institute of Technology",
             "country": "United States",
             "type_hint": OpportunityType.GRADUATE_PROGRAM,
-            "title_exclude": [
-                r"\bbachelor\b",
-                r"\bB\.S\.",
-                r"\bundergraduate\b",
-                r"\bminor\b",
-                r"\bcertificate\b",
-            ],
+            # The page reuses this class for a news rail, so require a degree
+            # word rather than trying to exclude every kind of stray story.
+            "title_require": [r"\bmaster\b", r"\bM\.S\.", r"\bMS\b", r"\bPh\.?D\b"],
+            "title_exclude": [r"\bbachelor\b", r"\bB\.S\.", r"\bundergraduate\b", r"\bminor\b"],
             "prefilter_by_title": True,
             "fetch_detail": True,
             "max_items": 60,

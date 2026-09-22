@@ -44,8 +44,18 @@ def seed_sources() -> None:
     db = SessionLocal()
     try:
         added = 0
+        refreshed = 0
         for entry in SEED_SOURCES:
-            if db.scalar(select(Source).where(Source.slug == entry["slug"])):
+            existing = db.scalar(select(Source).where(Source.slug == entry["slug"]))
+            if existing:
+                # Selectors get corrected as sites change, so the seed file is
+                # the source of truth for config. `enabled` is left alone: an
+                # operator may have switched a source off deliberately.
+                config = entry.get("config", {})
+                if existing.config != config:
+                    existing.config = config
+                    existing.name = entry["name"]
+                    refreshed += 1
                 continue
             adapter = get_adapter(entry["adapter"])
             db.add(
@@ -64,7 +74,10 @@ def seed_sources() -> None:
             )
             added += 1
         db.commit()
-        print(f"Seeded {added} source(s). {len(SEED_SOURCES) - added} already existed.")
+        print(
+            f"Seeded {added} source(s). {len(SEED_SOURCES) - added} already existed "
+            f"({refreshed} had their config refreshed from the seed file)."
+        )
         print("HTML-listing sources ship disabled — verify their selectors with:")
         print("  python -m app.agent.probe --url <list_url> --selector <item_selector>")
     finally:
