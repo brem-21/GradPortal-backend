@@ -157,14 +157,66 @@ and never implicit.
 
 ### OAuth setup
 
-**Google** — Cloud Console → Credentials → OAuth client (Web application).
-Redirect URI `http://localhost:3000/api/auth/callback/google`. Enable the **Gmail API**
-and add `https://www.googleapis.com/auth/gmail.send` to the consent screen. Without that
-scope users can sign in but cannot email contacts.
+Run the checker first — it verifies what it can without a browser and prints
+the exact redirect URIs to register:
 
-**LinkedIn** — developer.linkedin.com → Auth. Redirect `http://localhost:3000/api/auth/callback/linkedin`.
-Add the "Sign In with LinkedIn using OpenID Connect" product. LinkedIn is identity only;
-it cannot send mail.
+```bash
+cd frontend && npm run check:oauth
+```
+
+**Google** — https://console.cloud.google.com
+
+1. APIs & Services → Credentials → Create credentials → **OAuth client ID** →
+   *Web application*.
+2. Authorised redirect URI: `http://localhost:3000/api/auth/callback/google`
+   (add the production URL too when you deploy).
+3. APIs & Services → Library → enable the **Gmail API**. Without this the
+   token exchange succeeds and every send fails.
+4. OAuth consent screen → Scopes → add
+   `https://www.googleapis.com/auth/gmail.send`.
+5. While the consent screen is in *Testing*, add each account you will sign in
+   with under **Test users** — otherwise Google refuses with `access_denied`.
+6. Put the client ID and secret in `frontend/.env.local` as `AUTH_GOOGLE_ID`
+   and `AUTH_GOOGLE_SECRET`.
+
+**LinkedIn** — https://developer.linkedin.com
+
+1. Create an app and verify it against a LinkedIn Page you administer.
+2. Products → request **Sign In with LinkedIn using OpenID Connect**. Nothing
+   works until it is granted; it is usually immediate.
+3. Auth → Authorized redirect URLs:
+   `http://localhost:3000/api/auth/callback/linkedin`
+4. Put the client ID and secret in `frontend/.env.local` as
+   `AUTH_LINKEDIN_ID` and `AUTH_LINKEDIN_SECRET`.
+
+A provider button only renders once both its variables are present, so the
+sign-in page never offers an option that dead-ends. Restart the dev server
+after editing `.env.local` — Next reads it at boot.
+
+### What each provider can do
+
+|  | Google | LinkedIn |
+| --- | --- | --- |
+| Sign in | yes | yes |
+| Email address | yes | yes |
+| Name and picture | yes | yes |
+| Locale | yes | yes |
+| Headline, positions, education | no | no — needs the partner-gated `r_basicprofile` |
+| **Send email as the user** | **yes**, via `gmail.send` | **no** — LinkedIn has no send API at all |
+
+**LinkedIn cannot send mail.** It is an identity provider here and nothing
+more. A member who signs in with LinkedIn and wants outreach to leave their
+own address authorises Google separately from Settings → Connected accounts.
+That second authorisation must use the same email address, because accounts
+are keyed by email.
+
+### Verifying a real sign-in
+
+Signing in successfully and being able to send are different things: Google
+only returns a refresh token on an explicit offline consent. **Settings →
+Connected accounts** shows, per provider, whether a refresh token was stored,
+which scopes were granted, and the specific reason sending is blocked when it
+is. `GET /api/v1/auth/connections` returns the same thing as JSON.
 
 ---
 
