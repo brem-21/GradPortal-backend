@@ -51,10 +51,18 @@ def health() -> dict:
         checks["pgvector"] = "ok" if has_vector else "missing"
     except Exception as exc:
         checks["database"] = f"error: {exc}"
-    checks["embeddings"] = "configured" if embeddings.configured else "missing OPENAI_API_KEY"
+    checks["embeddings"] = (
+        f"configured ({embeddings.provider})"
+        if embeddings.configured
+        else "missing OPENROUTER_API_KEY"
+    )
     checks["internal_token"] = "configured" if settings.internal_service_token else "missing"
 
-    degraded = [key for key, value in checks.items() if value not in {"ok", "configured"}]
+    degraded = [
+        key
+        for key, value in checks.items()
+        if value != "ok" and not str(value).startswith("configured")
+    ]
     return {
         "service": settings.service_name,
         "status": "healthy" if not degraded else "degraded",

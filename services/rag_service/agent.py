@@ -48,11 +48,19 @@ class RetrievalOutcome:
 
     @property
     def strong_hits(self) -> int:
-        return sum(1 for hit in self.hits if hit["distance"] <= settings.weak_retrieval_distance)
+        return sum(1 for hit in self.hits if hit["distance"] <= settings.strong_hit_distance)
 
     @property
     def is_sufficient(self) -> bool:
-        return bool(self.hits) and self.strong_hits >= 1
+        """Whether there is anything worth showing the model.
+
+        Deliberately just "did we find anything": the grounding prompt already
+        requires the model to say when the excerpts do not answer the question,
+        and it can judge that from the text far better than a distance cutoff
+        can. Gating here on a distance floor made the assistant refuse
+        questions its own documents plainly answered.
+        """
+        return bool(self.hits)
 
 
 def _history(conversation: Conversation, limit: int) -> list[dict[str, str]]:

@@ -75,8 +75,8 @@ fi
 
 echo
 echo "── authenticated pages ────────────────────────────────────"
-for route in /overview /opportunities /saved /documents /evaluate /assistant \
-             /mentors /mentorship /profile /notifications; do
+for route in /overview /opportunities /shortlist /dossier /committee \
+             /mentors /mentorship /profile /settings /notifications; do
   body=$(curl -s -b "$JAR" --max-time 60 "$WEB$route")
   if printf '%s' "$body" | grep -q "Application error\|Internal Server Error\|Backend unreachable"; then
     bad "$route" "rendered an error"
@@ -115,6 +115,8 @@ else
   check "rag: GET /conversations"      200 "http://127.0.0.1:8002/conversations" "${AUTH[@]}"
   check "eval: GET /evaluations"       200 "http://127.0.0.1:8003/evaluations" "${AUTH[@]}"
   check "eval: PhD CV rubric"          200 "http://127.0.0.1:8003/evaluations/rubrics/cv?track=phd" "${AUTH[@]}"
+  check "admin: site media"            200 "$CORE/api/v1/admin/media" "${AUTH[@]}"
+  check "admin: stories"               200 "$CORE/api/v1/admin/stories" "${AUTH[@]}"
 
   n=$(curl -s --max-time 20 "${AUTH[@]}" "$CORE/api/v1/opportunities?regions=europe" \
       | python3 -c "import json,sys; print(json.load(sys.stdin).get('total','?'))" 2>/dev/null)

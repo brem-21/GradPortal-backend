@@ -9,12 +9,27 @@ class RagSettings(OpenRouterSettings):
     service_name: str = "rag-service"
     port: int = 8002
 
-    # Retrieval
+    # Retrieval.
+    #
+    # Thresholds measured against text-embedding-3-small on real application
+    # documents, not guessed. Cosine distances observed for a one-page CV:
+    #
+    #   0.56  "data engineering internship Airflow"  (specific, present)
+    #   0.70  "research experience"                  (present)
+    #   0.72  "teaching experience"                  (absent)
+    #   0.81  "machine learning segmentation model"  (present)
+    #   0.86  "what is my GPA"                       (present)
+    #   0.90  "favourite pizza topping"              (absurd)
+    #
+    # Relevant and irrelevant overlap heavily, because a short document is one
+    # chunk and its vector averages everything in it. Distance therefore cannot
+    # decide whether an answer is possible — only the model, reading the actual
+    # text, can. So max_distance is set to exclude the plainly absurd and
+    # nothing else, and sufficiency no longer depends on a distance floor.
     top_k: int = 8
-    max_distance: float = 0.72
-    # A second retrieval round only fires when the first is thin, so the common
-    # case stays one round-trip.
-    weak_retrieval_distance: float = 0.45
+    max_distance: float = 0.88
+    # Used only to decide whether a second, reworded search is worth running.
+    strong_hit_distance: float = 0.62
     min_strong_hits: int = 2
     max_search_rounds: int = 2
     max_queries_per_round: int = 3

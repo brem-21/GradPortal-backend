@@ -60,11 +60,24 @@ async def _fetch_documents(
             return_exceptions=True,
         )
         documents = []
+        failures = 0
         for document_id, result in zip(document_ids, results, strict=True):
             if isinstance(result, Exception):
-                log.warning("document_fetch_failed", document_id=str(document_id))
+                failures += 1
+                log.warning(
+                    "document_fetch_failed",
+                    document_id=str(document_id),
+                    error=str(result)[:300],
+                )
                 continue
             documents.append(result)
+        if not documents and failures:
+            # Every fetch failing is an outage, not an empty dossier; saying
+            # "upload a document" would send the user chasing the wrong thing.
+            raise UpstreamError(
+                f"None of the {failures} selected document(s) could be read from "
+                "doc-service. Check that it is running and healthy."
+            )
         return documents
 
     listing = await docs.get(
@@ -82,7 +95,16 @@ async def _fetch_documents(
         ),
         return_exceptions=True,
     )
-    return [item for item in fetched if not isinstance(item, Exception)]
+    usable = [item for item in fetched if not isinstance(item, Exception)]
+    if indexed and not usable:
+        for item in fetched:
+            if isinstance(item, Exception):
+                log.warning("document_fetch_failed", error=str(item)[:300])
+        raise UpstreamError(
+            f"{len(indexed)} indexed document(s) exist but none could be read from "
+            "doc-service. Check that it is running and healthy."
+        )
+    return usable
 
 
 async def _review_document(

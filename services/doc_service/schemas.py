@@ -73,6 +73,9 @@ class SearchResponse(BaseModel):
 
 
 class InternalDocumentText(BaseModel):
+    # Validated straight off the ORM row, so this is required.
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     kind: str
     title: str | None

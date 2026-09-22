@@ -1,11 +1,11 @@
 from functools import lru_cache
 
-from shared.config import OpenAISettings
+from shared.config import EmbeddingSettings
 
 SCHEMA = "docs"
 
 
-class DocSettings(OpenAISettings):
+class DocSettings(EmbeddingSettings):
     service_name: str = "doc-service"
     port: int = 8001
 

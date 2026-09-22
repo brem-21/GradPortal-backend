@@ -44,22 +44,50 @@ class BaseServiceSettings(BaseSettings):
         return self.environment == "development"
 
 
-class OpenAISettings(BaseServiceSettings):
-    """Embeddings only. OpenRouter does not expose an embeddings endpoint, which
-    is why a second provider key exists at all."""
-
-    openai_api_key: str = ""
-    embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = 1536
-
-
 class OpenRouterSettings(BaseServiceSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_default_model: str = "anthropic/claude-sonnet-4.5"
-    openrouter_reasoning_model: str = "deepseek/deepseek-r1"
+    openrouter_default_model: str = "openai/gpt-4o-mini"
+    openrouter_reasoning_model: str = "openai/o4-mini"
     openrouter_app_name: str = "GradPortal"
     openrouter_site_url: str = "http://localhost:3000"
+
+
+class EmbeddingSettings(OpenRouterSettings):
+    """Embeddings, served through OpenRouter.
+
+    OpenRouter exposes POST /api/v1/embeddings even though no embedding model
+    appears in its /models catalogue — which is why this looked unsupported.
+    Using it means one provider key for the whole system instead of two, and
+    no uploaded CV is sent anywhere the chat calls do not already go.
+
+    `openai_api_key` remains as an optional override for anyone who would
+    rather bill embeddings to OpenAI directly.
+    """
+
+    embedding_model: str = "openai/text-embedding-3-small"
+    embedding_dimensions: int = 1536
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+
+    @property
+    def embeddings_use_openai_directly(self) -> bool:
+        return bool(self.openai_api_key)
+
+    @property
+    def embeddings_base_url(self) -> str:
+        return self.openai_base_url if self.openai_api_key else self.openrouter_base_url
+
+    @property
+    def embeddings_api_key(self) -> str:
+        return self.openai_api_key or self.openrouter_api_key
+
+    @property
+    def embeddings_model_id(self) -> str:
+        # OpenAI's own API does not accept the "openai/" provider prefix.
+        if self.openai_api_key:
+            return self.embedding_model.removeprefix("openai/")
+        return self.embedding_model
 
 
 @lru_cache
