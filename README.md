@@ -131,18 +131,29 @@ Postgres is on **5437**, not 5432, to avoid colliding with other local projects.
 
 | Key | Needed by | What breaks without it |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | doc-service | Documents parse but cannot be indexed, so the assistant cannot search them. **OpenRouter has no embeddings endpoint** — this is why a second provider key exists at all. |
-| `OPENROUTER_API_KEY` | rag-service, eval-service | Chat and document review cannot run. |
+| `OPENROUTER_API_KEY` | doc, rag, eval | Everything AI: indexing, Counsel and the Committee. **One key covers all three** — embeddings included. |
 | `ELEVENLABS_API_KEY` | voice-service | No speech input, no spoken replies. Text still works. |
 | `INTERNAL_SERVICE_TOKEN` | all services | `/internal/*` routes refuse every caller. |
+| `OPENAI_API_KEY` | doc-service | Optional. Set it only to bill embeddings to OpenAI directly instead of through OpenRouter. |
+
+**Embeddings go through OpenRouter.** Its `POST /api/v1/embeddings` endpoint is
+OpenAI-compatible and serves `openai/text-embedding-3-small` at 1536 dimensions,
+honouring the `dimensions` parameter and batching. No embedding model appears in
+OpenRouter's `/models` catalogue, which makes the endpoint easy to miss — it
+works regardless.
 
 Every service reports which of its keys are missing at `/health`, and each screen that
 depends on one says so in place rather than failing opaquely.
 
 **Models.** OpenRouter is pointed at OpenAI models by default —
-`openai/gpt-4o-mini` for chat, `openai/o4-mini` for the reasoning toggle and for all
-document evaluation. Change `OPENROUTER_DEFAULT_MODEL` / `OPENROUTER_REASONING_MODEL` in
+`openai/gpt-4o-mini` for chat, `openai/o4-mini` for the reasoning toggle and all
+document evaluation, `openai/text-embedding-3-small` for indexing. Change
+`OPENROUTER_DEFAULT_MODEL`, `OPENROUTER_REASONING_MODEL` or `EMBEDDING_MODEL` in
 `services/.env` to use anything else OpenRouter serves.
+
+**Web search** uses OpenRouter's `web` plugin, opt-in per message. It costs
+roughly 3500x a plain call (~$0.007 vs ~$0.000002), which is why it is a toggle
+and never implicit.
 
 ### OAuth setup
 
@@ -433,6 +444,10 @@ outside `ENVIRONMENT=development`.
   `ALLOW_DEV_SIGNIN` should still be absent from any deployed environment.
 - **Profile pictures are required** to finish onboarding but are stored as a URL, not
   an upload; there is no avatar object storage wired up.
+- **Retrieval thresholds are measured, not guessed.** `rag_service/config.py`
+  records the cosine distances observed against real documents and explains why
+  the answer is not gated on them: for a short document, relevant and irrelevant
+  queries overlap heavily, so only the model reading the text can judge.
 - **LinkedIn and Handshake are off by default** and cannot be switched on without the
   credentials described above. This is a legal and technical constraint, not an
   unfinished feature.

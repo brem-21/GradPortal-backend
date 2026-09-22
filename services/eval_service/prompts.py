@@ -174,9 +174,10 @@ Return ONLY a JSON object in exactly this shape:
   "verdict": "one of: competitive, borderline, needs work, not ready",
   "summary": "Three to five sentences. The committee's overall read of this file.",
   "committee_note": "The blunt version — what would actually be said in the room, including the thing the applicant will not want to hear. Two to four sentences.",
-  "priority_actions": ["Up to five concrete actions, ordered by impact on the decision. Each names a specific document and a specific change."],
-  "missing_documents": ["Documents this track expects that are absent and would materially help. Empty if none."]
-}}"""
+  "priority_actions": ["Up to five concrete actions, ordered by impact on the decision. Each names a specific document and a specific change."]
+}}
+
+The list of missing documents is computed from the file itself and given to you below — do not repeat it back, but do weigh it in your verdict."""
 
     lines = []
     for assessment in assessments:
