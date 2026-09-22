@@ -170,6 +170,57 @@ SEED_SOURCES: list[dict] = [
         },
     },
 
+    {
+        # VERIFIED — 33 programmes matched. The list mixes undergraduate and
+        # graduate study, so bachelor's and minors are excluded by title.
+        "slug": "georgia-tech-computing",
+        "name": "Georgia Tech — College of Computing degrees",
+        "kind": SourceKind.UNIVERSITY,
+        "adapter": "html_listing",
+        "base_url": "https://www.cc.gatech.edu",
+        "enabled": True,
+        "config": {
+            "list_url": "https://www.cc.gatech.edu/degree-programs/",
+            "item_selector": "div.views-field-title",
+            "organization": "Georgia Institute of Technology",
+            "country": "United States",
+            "type_hint": OpportunityType.GRADUATE_PROGRAM,
+            "title_exclude": [
+                r"\bbachelor\b",
+                r"\bB\.S\.",
+                r"\bundergraduate\b",
+                r"\bminor\b",
+                r"\bcertificate\b",
+            ],
+            "prefilter_by_title": True,
+            "fetch_detail": True,
+            "max_items": 60,
+        },
+    },
+    {
+        # VERIFIED — 23 cards matched; the marketing ones carry no field in
+        # their title and are dropped by the scope prefilter.
+        "slug": "northeastern-khoury",
+        "name": "Northeastern — Khoury College of Computer Sciences",
+        "kind": SourceKind.UNIVERSITY,
+        "adapter": "html_listing",
+        "base_url": "https://www.khoury.northeastern.edu",
+        "enabled": True,
+        "config": {
+            "list_url": "https://www.khoury.northeastern.edu/programs/",
+            "item_selector": "div.standard-card__content",
+            "title_selector": "h3.standard-card__title",
+            "organization": "Northeastern University",
+            "country": "United States",
+            "type_hint": OpportunityType.GRADUATE_PROGRAM,
+            "degree_hint": [DegreeLevel.MASTERS],
+            "title_exclude": [r"\bbachelor\b", r"\bBS in\b", r"\bPhD\b.*\bapply\b"],
+            "prefilter_by_title": True,
+            "fetch_detail": True,
+            "max_items": 40,
+        },
+    },
+
     # ---------------- HTML listings (UNVERIFIED selectors — probe, then enable) ----------------
     {
         "slug": "daad-scholarship-database",

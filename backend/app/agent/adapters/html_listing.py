@@ -19,6 +19,7 @@ Source.config:
 """
 
 import asyncio
+import re
 from urllib.parse import urljoin
 
 import structlog
@@ -67,6 +68,23 @@ class HTMLListingAdapter(SourceAdapter):
                     result.warnings.append(f"Could not fetch {page_url}")
                     continue
                 self._parse_listing(html, page_url, config, source, result, max_items)
+
+            # Some catalogues mix undergraduate and graduate study in one list.
+            # Excluding by title is cheaper and more reliable than trying to
+            # infer the level from a page we have not fetched yet.
+            excludes = config.get("title_exclude") or []
+            if excludes:
+                pattern = re.compile("|".join(excludes), re.IGNORECASE)
+                before = len(result.opportunities)
+                result.opportunities = [
+                    item for item in result.opportunities if not pattern.search(item.title)
+                ]
+                if before != len(result.opportunities):
+                    log.info(
+                        "excluded_by_title",
+                        source=source.slug,
+                        dropped=before - len(result.opportunities),
+                    )
 
             # Drop out-of-scope items before fetching their detail pages. A
             # university course catalogue lists every programme it offers —
