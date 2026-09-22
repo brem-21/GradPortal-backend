@@ -4,6 +4,7 @@ from app.api.v1 import (
     auth,
     content,
     mentorship,
+    news,
     notifications,
     opportunities,
     outreach,
@@ -18,6 +19,7 @@ api_router.include_router(content.admin_router)
 api_router.include_router(users.router)
 api_router.include_router(opportunities.router)
 api_router.include_router(outreach.router)
+api_router.include_router(news.router)
 api_router.include_router(notifications.router)
 api_router.include_router(mentorship.router)
 api_router.include_router(sources.router)

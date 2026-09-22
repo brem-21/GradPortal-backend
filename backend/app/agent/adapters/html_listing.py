@@ -69,39 +69,16 @@ class HTMLListingAdapter(SourceAdapter):
                     continue
                 self._parse_listing(html, page_url, config, source, result, max_items)
 
-            # Some catalogues mix undergraduate and graduate study in one list.
-            # Excluding by title is cheaper and more reliable than trying to
-            # infer the level from a page we have not fetched yet.
-            # Some pages reuse the programme-card class for a news block. When
-            # the catalogue names degrees consistently, requiring the degree
-            # word is more robust than excluding each kind of stray item.
-            requires = config.get("title_require") or []
-            if requires:
-                pattern = re.compile("|".join(requires), re.IGNORECASE)
-                before = len(result.opportunities)
-                result.opportunities = [
-                    item for item in result.opportunities if pattern.search(item.title)
-                ]
-                if before != len(result.opportunities):
-                    log.info(
-                        "dropped_missing_required_title",
-                        source=source.slug,
-                        dropped=before - len(result.opportunities),
-                    )
-
-            excludes = config.get("title_exclude") or []
-            if excludes:
-                pattern = re.compile("|".join(excludes), re.IGNORECASE)
-                before = len(result.opportunities)
-                result.opportunities = [
-                    item for item in result.opportunities if not pattern.search(item.title)
-                ]
-                if before != len(result.opportunities):
-                    log.info(
-                        "excluded_by_title",
-                        source=source.slug,
-                        dropped=before - len(result.opportunities),
-                    )
+            # A listing page rarely holds only what we want: catalogues mix
+            # undergraduate with graduate study, and some reuse the programme
+            # card class for a news rail. Both are settled on the title, before
+            # any detail page is fetched.
+            self._filter_titles(
+                result, source, config.get("title_require"), keep_matches=True
+            )
+            self._filter_titles(
+                result, source, config.get("title_exclude"), keep_matches=False
+            )
 
             # Drop out-of-scope items before fetching their detail pages. A
             # university course catalogue lists every programme it offers —
@@ -141,6 +118,27 @@ class HTMLListingAdapter(SourceAdapter):
         pages = int(pagination.get("pages", 1))
         separator = "&" if "?" in list_url else "?"
         return [f"{list_url}{separator}{param}={start + i}" for i in range(pages)]
+
+    @staticmethod
+    def _filter_titles(result, source, patterns, *, keep_matches: bool) -> None:
+        """Keep or drop listing items by title, in place."""
+        if not patterns:
+            return
+        pattern = re.compile("|".join(patterns), re.IGNORECASE)
+        before = len(result.opportunities)
+        result.opportunities = [
+            item
+            for item in result.opportunities
+            if bool(pattern.search(item.title)) is keep_matches
+        ]
+        dropped = before - len(result.opportunities)
+        if dropped:
+            log.info(
+                "filtered_by_title",
+                source=source.slug,
+                dropped=dropped,
+                rule="require" if keep_matches else "exclude",
+            )
 
     def _parse_listing(
         self,
