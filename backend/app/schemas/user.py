@@ -162,3 +162,23 @@ class SessionSyncPayload(BaseModel):
     avatar_url: str | None = None
     provider_profile: ProviderProfile | None = None
     account: OAuthAccountUpsert | None = None
+
+
+class ConnectionRead(BaseModel):
+    """One linked identity provider, and what it can actually do."""
+
+    provider: str
+    provider_account_id: str
+    scopes: list[str]
+    connected_at: datetime
+    expires_at: datetime | None
+    has_refresh_token: bool
+    can_send_mail: bool
+    # Why it cannot send, when it cannot. Empty when it can.
+    blocked_reason: str | None = None
+
+
+class ConnectionsRead(BaseModel):
+    connections: list[ConnectionRead]
+    can_send_email_as_self: bool
+    sending_provider: str | None

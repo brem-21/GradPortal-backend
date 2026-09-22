@@ -12,6 +12,7 @@ import pathlib
 import sys
 import uuid
 from datetime import UTC, date, datetime, timedelta
+from urllib.parse import quote
 
 from cryptography.fernet import Fernet
 from jose import jwt
@@ -386,6 +387,24 @@ def seed_media() -> None:
 
 
 
+def monogram_avatar(name: str) -> str:
+    """An inline SVG monogram, as a data URI.
+
+    Used for the development accounts so the required-photograph rule is
+    satisfied without hotlinking an image service or shipping a photograph of
+    a real person.
+    """
+    initials = "".join(part[0] for part in name.split()[:2]).upper() or "?"
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>"
+        "<rect width='200' height='200' fill='#1c1c1c'/>"
+        "<text x='100' y='100' fill='#ffffff' font-family='sans-serif' "
+        "font-size='76' font-weight='300' text-anchor='middle' "
+        f"dominant-baseline='central'>{initials}</text></svg>"
+    )
+    return "data:image/svg+xml;utf8," + quote(svg)
+
+
 # Accounts for clicking through the app before OAuth is configured.
 #
 # The domain is a subdomain of example.com, which RFC 2606 reserves for
@@ -416,12 +435,9 @@ def demo_users() -> None:
                 user.role = role
                 action = "updated"
 
-            # A generated avatar keeps the required-picture rule satisfied
-            # without shipping a photograph of a real person.
-            initials = "".join(part[0] for part in name.split()[:2]).upper()
-            user.avatar_url = (
-                f"https://placehold.co/200x200/1c1c1c/ffffff/png?text={initials}"
-            )
+            # A self-contained monogram, not a hotlinked placeholder service:
+            # it renders offline and depends on nothing we do not control.
+            user.avatar_url = monogram_avatar(name)
             user.onboarding_completed = onboarded
 
             if onboarded and user.preference is not None:

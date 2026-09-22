@@ -47,64 +47,72 @@ def _resolve_contact(
 def _compose(
     user: User, opportunity: Opportunity, contact: OpportunityContact | None
 ) -> tuple[str, str]:
+    """Build a first draft from what the profile actually contains.
+
+    Nothing is invented and nothing is bracketed: a line only appears when
+    there is real content behind it. A draft peppered with "[your background
+    here]" gets sent with the brackets still in it often enough that leaving
+    them out is safer than prompting.
+    """
     profile = user.profile
     name = user.full_name or user.email.split("@")[0]
     greeting = f"Dear {contact.name}," if contact and contact.name else "Dear Sir or Madam,"
 
-    background_bits = []
+    # Who they are, from the profile. Omitted entirely when unknown.
+    standing_bits: list[str] = []
     if profile:
         if profile.current_title and profile.current_institution:
-            background_bits.append(f"{profile.current_title} at {profile.current_institution}")
+            standing_bits.append(f"{profile.current_title} at {profile.current_institution}")
         elif profile.current_institution:
-            background_bits.append(f"currently at {profile.current_institution}")
+            standing_bits.append(f"currently at {profile.current_institution}")
+        elif profile.current_title:
+            standing_bits.append(profile.current_title)
         if profile.target_degree_level:
-            background_bits.append(f"applying for {profile.target_degree_level} study")
+            standing_bits.append(f"applying for {profile.target_degree_level} study")
         if profile.country:
-            background_bits.append(f"based in {profile.country}")
-    background = ", ".join(background_bits) if background_bits else "an applicant"
+            standing_bits.append(f"based in {profile.country}")
+    standing = ", " + ", ".join(standing_bits) if standing_bits else ""
 
     subject = f"Enquiry — {opportunity.title}"
     if opportunity.organization:
         subject = f"Enquiry — {opportunity.title} ({opportunity.organization})"
 
-    deadline_line = ""
+    where = f" at {opportunity.organization}" if opportunity.organization else ""
+    paragraphs = [
+        greeting,
+        f"My name is {name}{standing}. I am writing about the "
+        f"{opportunity.title}{where}.",
+    ]
+
     if opportunity.application_deadline:
-        deadline_line = (
+        paragraphs.append(
             f"I note the application deadline is "
-            f"{opportunity.application_deadline.strftime('%d %B %Y')}. "
+            f"{opportunity.application_deadline.strftime('%d %B %Y')}. I would be "
+            "grateful for any guidance on the application requirements, and on "
+            "whether the position remains open to new applicants."
+        )
+    else:
+        paragraphs.append(
+            "I would be grateful for any guidance on the application requirements, "
+            "and on whether the position remains open to new applicants."
         )
 
-    headline_line = (
-        profile.headline
-        if profile and profile.headline
-        else "[add one or two lines about your background here]"
-    )
+    # Background, only if the profile carries something substantive.
+    background = (profile.headline or profile.bio) if profile else None
+    if background:
+        paragraphs.append(background.strip())
 
     links = [f"Listing: {opportunity.url}"]
     if profile and profile.linkedin_url:
         links.append(f"LinkedIn: {profile.linkedin_url}")
     if profile and profile.cv_url:
         links.append(f"CV: {profile.cv_url}")
+    paragraphs.append("\n".join(links))
 
-    body = f"""{greeting}
+    paragraphs.append("Thank you for your time. I look forward to hearing from you.")
+    paragraphs.append(f"Kind regards,\n{name}\n{user.email}")
 
-My name is {name}, {background}. I am writing about the {opportunity.title}\
-{f" at {opportunity.organization}" if opportunity.organization else ""}.
-
-{deadline_line}I would be grateful for any guidance on the application requirements, and on \
-whether the position remains open to new applicants.
-
-A short note on my background: {headline_line}
-
-{chr(10).join(links)}
-
-Thank you for your time. I look forward to hearing from you.
-
-Kind regards,
-{name}
-{user.email}"""
-
-    return subject, body
+    return subject, "\n\n".join(paragraphs)
 
 
 @router.post("/draft", response_model=OutreachDraft)

@@ -8,8 +8,8 @@ from app.core.db import get_db
 from app.core.security import TokenClaims
 from app.models import OAuthAccount, Profile, User
 from app.schemas.common import Message
-from app.schemas.user import SessionSyncPayload
-from app.services.providers import account_can_send
+from app.schemas.user import ConnectionRead, ConnectionsRead, SessionSyncPayload
+from app.services.providers import account_can_send, pick_sending_account
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -142,4 +142,63 @@ def sync_session(
         detail=(
             "Session synced; mailbox connected." if account_can_send(account) else "Session synced."
         )
+    )
+
+
+@router.get("/connections", response_model=ConnectionsRead)
+def read_connections(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> ConnectionsRead:
+    """What is linked, and whether it can send mail.
+
+    Exists because "sign-in worked" and "outreach will work" are different
+    questions: Google only returns a refresh token on an explicit offline
+    consent, so an account can authenticate perfectly and still be unable to
+    send a single email. Without this the failure only surfaces when someone
+    presses send on a message they have spent ten minutes writing.
+    """
+    accounts = list(user.accounts)
+    sending = pick_sending_account(accounts)
+
+    connections = []
+    for account in accounts:
+        has_refresh = account.refresh_token_encrypted is not None
+        can_send = account_can_send(account)
+        reason: str | None = None
+        if not can_send:
+            if account.provider == "dev":
+                reason = (
+                    "Development sign-in has no mailbox behind it. Sign in with "
+                    "Google to send email."
+                )
+            elif account.provider == "linkedin":
+                reason = "LinkedIn cannot send mail; it is an identity provider only."
+            elif not has_refresh:
+                reason = (
+                    "No refresh token was returned. Google only issues one on an "
+                    "explicit offline consent — sign out and sign back in."
+                )
+            else:
+                reason = (
+                    "The send scope was not granted. Re-authorise and accept the "
+                    "permission to send email on your behalf."
+                )
+
+        connections.append(
+            ConnectionRead(
+                provider=account.provider,
+                provider_account_id=account.provider_account_id,
+                scopes=account.scopes or [],
+                connected_at=account.created_at,
+                expires_at=account.expires_at,
+                has_refresh_token=has_refresh,
+                can_send_mail=can_send,
+                blocked_reason=reason,
+            )
+        )
+
+    return ConnectionsRead(
+        connections=sorted(connections, key=lambda c: c.provider),
+        can_send_email_as_self=sending is not None,
+        sending_provider=sending.provider if sending else None,
     )
