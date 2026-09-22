@@ -187,13 +187,32 @@ class OpenRouterClient:
         model: str | None = None,
         temperature: float = 0.3,
         max_tokens: int = 2048,
-    ) -> AsyncIterator[dict[str, str]]:
-        """Yield {"type": "reasoning"|"content", "text": ...} as tokens arrive."""
-        chosen = model or self.model_for(reasoning)
-        payload = self._payload(messages, chosen, temperature, max_tokens, False, True)
+        web_search: bool = False,
+        web_max_results: int = 4,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Yield events as they arrive.
 
+        Event shapes:
+          {"type": "reasoning", "text": ...}   a reasoning-model chain fragment
+          {"type": "content",   "text": ...}   an answer fragment
+          {"type": "citations", "items": [...]} web sources, once they arrive
+          {"type": "done",      "model": ...}
+        """
+        chosen = model or self.model_for(reasoning)
+        payload = self._payload(
+            messages,
+            chosen,
+            temperature,
+            max_tokens,
+            False,
+            True,
+            web_search,
+            web_max_results,
+        )
+
+        seen_citations = False
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=10.0)) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as client:
                 async with client.stream(
                     "POST",
                     f"{self.settings.openrouter_base_url}/chat/completions",
@@ -203,6 +222,7 @@ class OpenRouterClient:
                     if response.status_code >= 400:
                         body = (await response.aread()).decode()[:300]
                         raise UpstreamError(f"OpenRouter returned {response.status_code}: {body}")
+
                     async for line in response.aiter_lines():
                         if not line.startswith("data: "):
                             continue
@@ -213,13 +233,33 @@ class OpenRouterClient:
                             parsed = json.loads(chunk)
                         except json.JSONDecodeError:
                             continue
-                        delta = ((parsed.get("choices") or [{}])[0]).get("delta") or {}
+
+                        choice = (parsed.get("choices") or [{}])[0]
+                        delta = choice.get("delta") or {}
+
                         if delta.get("reasoning"):
                             yield {"type": "reasoning", "text": delta["reasoning"]}
                         if delta.get("content"):
                             yield {"type": "content", "text": delta["content"]}
+
+                        # Annotations may land on the delta or on the finished
+                        # message, depending on the upstream provider.
+                        if not seen_citations:
+                            citations = self._citations(delta) or self._citations(
+                                choice.get("message") or {}
+                            )
+                            if citations:
+                                seen_citations = True
+                                yield {
+                                    "type": "citations",
+                                    "items": [
+                                        {"title": c.title, "url": c.url} for c in citations
+                                    ],
+                                }
         except httpx.HTTPError as exc:
             raise UpstreamError(f"OpenRouter stream failed: {exc}") from exc
+
+        yield {"type": "done", "model": chosen}
 
 
 def extract_json(text: str) -> dict[str, Any]:

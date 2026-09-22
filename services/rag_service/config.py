@@ -29,8 +29,12 @@ class RagSettings(OpenRouterSettings):
     top_k: int = 8
     max_distance: float = 0.88
     # Used only to decide whether a second, reworded search is worth running.
+    # One strong hit is enough: requiring two meant the second round fired on
+    # almost every question (relevant matches sit at 0.56-0.86, so rarely do
+    # two land under 0.62), adding a planning call plus three more searches —
+    # several seconds — to answers the first round had already covered.
     strong_hit_distance: float = 0.62
-    min_strong_hits: int = 2
+    min_strong_hits: int = 1
     max_search_rounds: int = 2
     max_queries_per_round: int = 3
 

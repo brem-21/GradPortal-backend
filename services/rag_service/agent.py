@@ -7,6 +7,8 @@ it is not. It stops at two rounds — an unbounded loop mostly burns tokens
 re-finding the same chunks.
 """
 
+import asyncio
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -68,10 +70,40 @@ def _history(conversation: Conversation, limit: int) -> list[dict[str, str]]:
     return [{"role": message.role, "content": message.content} for message in recent]
 
 
+# A question that refers to earlier turns cannot be embedded as-is — "does it
+# mention that?" retrieves nothing. Anything else usually can be.
+REFERENTIAL = re.compile(
+    r"\b(it|that|this|those|these|they|them|there|the (one|same)|"
+    r"above|previous|earlier|instead|also|too)\b",
+    re.IGNORECASE,
+)
+
+
+def _needs_planning(question: str, history: list[dict[str, str]]) -> bool:
+    """Whether the query planner earns its round-trip.
+
+    Planning is a full LLM call before retrieval can even start, which is the
+    largest single component of time-to-first-token. A short, self-contained
+    opening question embeds perfectly well on its own, so the call is skipped
+    for it and spent only where it changes the result.
+    """
+    words = question.split()
+    if len(words) > 18:
+        return True  # long questions often contain several separable asks
+    if history:
+        return True  # a follow-up may lean on earlier turns
+    if REFERENTIAL.search(question):
+        return True
+    return False
+
+
 async def _plan_queries(
     question: str, history: list[dict[str, str]], round_index: int
 ) -> list[str]:
     """Ask the fast model what to search for. Falls back to the raw question."""
+    if round_index == 0 and not _needs_planning(question, history):
+        return [question]
+
     instruction = QUERY_PLANNER.format(max_queries=settings.max_queries_per_round)
     if round_index > 0:
         instruction += (
@@ -102,8 +134,14 @@ async def _search(
     document_ids: list[uuid.UUID],
     user_token: str | None,
 ) -> list[dict]:
-    seen: dict[str, dict] = {}
-    for query in queries:
+    """Run every query for a round concurrently.
+
+    Each is an embedding call plus a vector scan, around a second apiece, and
+    they do not depend on each other — running them in sequence put three
+    seconds of avoidable latency in front of the first token.
+    """
+
+    async def one(query: str) -> list[dict]:
         response = await docs.post(
             "/internal/search",
             json={
@@ -115,7 +153,16 @@ async def _search(
             },
             user_token=user_token,
         )
-        for hit in response.get("hits", []):
+        return response.get("hits", [])
+
+    results = await asyncio.gather(*(one(query) for query in queries), return_exceptions=True)
+
+    seen: dict[str, dict] = {}
+    for result in results:
+        if isinstance(result, BaseException):
+            log.warning("search_query_failed", error=str(result)[:200])
+            continue
+        for hit in result:
             # The same chunk found by two queries keeps its best distance.
             existing = seen.get(hit["chunk_id"])
             if existing is None or hit["distance"] < existing["distance"]:
@@ -130,8 +177,14 @@ async def retrieve(
     conversation: Conversation,
     user_token: str | None,
 ) -> RetrievalOutcome:
-    history = _history(conversation, 4)
+    # The caller has already appended this turn's question to the conversation,
+    # so the last message IS the question. Including it here made every
+    # question look like a follow-up and forced a planning round-trip on all
+    # of them.
+    prior = [m for m in conversation.messages if m.content != question]
+    history = [{"role": m.role, "content": m.content} for m in prior[-4:]]
     outcome = RetrievalOutcome()
+    started = time.perf_counter()
 
     try:
         listing = await docs.get(
@@ -161,10 +214,24 @@ async def retrieve(
                 merged[hit["chunk_id"]] = hit
         outcome.hits = sorted(merged.values(), key=lambda hit: hit["distance"])
 
-        if outcome.strong_hits >= settings.min_strong_hits:
+        # A second, reworded round is a rescue for a search that found
+        # nothing — not a refinement of one that found something. Relevant
+        # matches routinely sit just outside any "strong" cutoff (the best hit
+        # for a plain skills question measures 0.64), so gating on hit quality
+        # made the rescue fire on nearly every question and doubled the wait
+        # for no change in the answer.
+        if outcome.hits:
             break
 
     outcome.hits = outcome.hits[: settings.top_k]
+    log.info(
+        "retrieval_complete",
+        rounds=outcome.rounds,
+        queries=len(outcome.queries),
+        hits=len(outcome.hits),
+        strong=outcome.strong_hits,
+        ms=int((time.perf_counter() - started) * 1000),
+    )
     return outcome
 
 
