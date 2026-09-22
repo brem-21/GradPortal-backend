@@ -98,6 +98,78 @@ SEED_SOURCES: list[dict] = [
         },
     },
 
+
+    # ---------------- Universities (VERIFIED against the live pages) ----------------
+    #
+    # Selectors below were confirmed with `python -m app.agent.probe` on
+    # 2026-09-22 and the match counts recorded. Course catalogues list every
+    # programme a university offers, so `max_items` is set high enough to reach
+    # the whole list and `prefilter_by_title` then drops everything outside the
+    # five fields *before* any detail page is fetched.
+    {
+        # VERIFIED — 279 programmes matched. Drupal views listing, stable markup.
+        "slug": "edinburgh-postgraduate-taught",
+        "name": "University of Edinburgh — taught postgraduate degrees",
+        "kind": SourceKind.UNIVERSITY,
+        "adapter": "html_listing",
+        "base_url": "https://www.ed.ac.uk",
+        "enabled": True,
+        "config": {
+            "list_url": (
+                "https://www.ed.ac.uk/studying/postgraduate/degrees"
+                "?r=site/taught&edition=2026&sid=&cw_xml=search.php"
+            ),
+            "item_selector": "div.views-row",
+            "organization": "University of Edinburgh",
+            "country": "United Kingdom",
+            "type_hint": OpportunityType.GRADUATE_PROGRAM,
+            "degree_hint": [DegreeLevel.MASTERS],
+            "prefilter_by_title": True,
+            "fetch_detail": True,
+            "max_items": 400,
+        },
+    },
+    {
+        # VERIFIED — 92 programmes matched.
+        "slug": "kth-master-programmes",
+        "name": "KTH Royal Institute of Technology — master's programmes",
+        "kind": SourceKind.UNIVERSITY,
+        "adapter": "html_listing",
+        "base_url": "https://www.kth.se",
+        "enabled": True,
+        "config": {
+            "list_url": "https://www.kth.se/en/studies/master/programmes",
+            "item_selector": "div.block.list li",
+            "organization": "KTH Royal Institute of Technology",
+            "country": "Sweden",
+            "type_hint": OpportunityType.GRADUATE_PROGRAM,
+            "degree_hint": [DegreeLevel.MASTERS],
+            "prefilter_by_title": True,
+            "fetch_detail": True,
+            "max_items": 150,
+        },
+    },
+    {
+        # VERIFIED — 29 programmes matched.
+        "slug": "epfl-master-programs",
+        "name": "EPFL — master's programmes",
+        "kind": SourceKind.UNIVERSITY,
+        "adapter": "html_listing",
+        "base_url": "https://www.epfl.ch",
+        "enabled": True,
+        "config": {
+            "list_url": "https://www.epfl.ch/education/master/programs/",
+            "item_selector": "div.col-sm-6.col-xl-4",
+            "organization": "EPFL",
+            "country": "Switzerland",
+            "type_hint": OpportunityType.GRADUATE_PROGRAM,
+            "degree_hint": [DegreeLevel.MASTERS],
+            "prefilter_by_title": True,
+            "fetch_detail": True,
+            "max_items": 60,
+        },
+    },
+
     # ---------------- HTML listings (UNVERIFIED selectors — probe, then enable) ----------------
     {
         "slug": "daad-scholarship-database",

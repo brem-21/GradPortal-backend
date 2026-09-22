@@ -32,7 +32,11 @@ def notify(
     notification = Notification(
         user_id=user.id,
         type=str(type_),
-        title=title,
+        # The column is varchar(255) and callers build titles from scraped
+        # data. An over-long title used to abort the whole transaction that
+        # created it — which meant one verbose course description could fail
+        # an entire crawl.
+        title=title[:255],
         body=body,
         link=link,
         payload=payload or {},

@@ -21,14 +21,17 @@ Source.config:
 import asyncio
 from urllib.parse import urljoin
 
+import structlog
 from selectolax.parser import HTMLParser
 
 from app.agent.base import AdapterResult, RawOpportunity, SourceAdapter
 from app.agent.contacts import extract_contacts_from_html
 from app.agent.http import build_client, fetch_text
-from app.agent.normalize import clean_text
+from app.agent.normalize import classify_fields, clean_text
 from app.core.config import settings
 from app.models import Source
+
+log = structlog.get_logger(__name__)
 
 
 def _text_of(node, selector: str | None) -> str:
@@ -65,6 +68,26 @@ class HTMLListingAdapter(SourceAdapter):
                     continue
                 self._parse_listing(html, page_url, config, source, result, max_items)
 
+            # Drop out-of-scope items before fetching their detail pages. A
+            # university course catalogue lists every programme it offers —
+            # Edinburgh alone has 279 — and fetching all of them to keep the
+            # dozen in computing would be both slow and rude to the host.
+            if config.get("prefilter_by_title", True):
+                before = len(result.opportunities)
+                result.opportunities = [
+                    item
+                    for item in result.opportunities
+                    if classify_fields(item.title, item.summary)
+                ]
+                dropped = before - len(result.opportunities)
+                if dropped:
+                    log.info(
+                        "prefiltered_out_of_scope",
+                        source=source.slug,
+                        kept=len(result.opportunities),
+                        dropped=dropped,
+                    )
+
             if config.get("fetch_detail", True):
                 await self._enrich(client, result.opportunities, config)
 
@@ -98,10 +121,19 @@ class HTMLListingAdapter(SourceAdapter):
             if len(result.opportunities) >= max_items:
                 return
 
-            title = _text_of(item, config.get("title_selector"))
+            # Only read a configured selector. `_text_of(item, None)` returns
+            # the node's entire text, so without this the "title" became the
+            # whole card — heading, delivery mode and the full blurb — and the
+            # heading fallback below could never run.
+            title_selector = config.get("title_selector")
+            title = _text_of(item, title_selector) if title_selector else ""
             if not title:
-                heading = item.css_first("h1, h2, h3, h4") or item.css_first("a")
+                heading = item.css_first("h1, h2, h3, h4, h5") or item.css_first("a")
                 title = clean_text(heading.text(strip=True)) if heading else ""
+            # A "title" this long is a blurb that slipped through; taking the
+            # first line is closer to the real name than the whole paragraph.
+            if len(title) > 200:
+                title = title.split("\n")[0][:200].strip()
             if not title:
                 continue
 

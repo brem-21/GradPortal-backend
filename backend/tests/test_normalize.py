@@ -114,3 +114,87 @@ class TestContentHash:
         assert content_hash("PhD in AI", "https://x.edu/a", "MIT") != content_hash(
             "PhD in AI", "https://x.edu/a", "Stanford"
         )
+
+
+class TestRealCatalogueTitles:
+    """Regressions from crawling real university course catalogues.
+
+    Every title here was produced by an actual crawl of Edinburgh, KTH or EPFL
+    and misclassified before the pattern it exercises was added.
+    """
+
+    def test_law_degrees_are_not_artificial_intelligence(self):
+        # "LLM" is Master of Laws far more often than Large Language Model in
+        # a course catalogue; the bare abbreviation used to match.
+        for title in (
+            "European Law LLM",
+            "Commercial Law LLM",
+            "Information Technology Law (Online Learning) LLM",
+            "Comparative Private Law LLM",
+        ):
+            assert classify_fields(title) == [], title
+
+    def test_large_language_models_still_classify(self):
+        assert FieldOfStudy.ARTIFICIAL_INTELLIGENCE in classify_fields(
+            "Large Language Models and Generative AI"
+        )
+
+    def test_finance_degrees_are_not_data_analytics(self):
+        # Bare "analytics" used to catch these.
+        for title in (
+            "Banking Innovation and Risk Analytics MSc",
+            "Accounting and Financial Management MSc",
+        ):
+            assert classify_fields(title) == [], title
+
+    def test_qualified_analytics_still_classifies(self):
+        assert FieldOfStudy.DATA_ANALYTICS in classify_fields("Business Analytics MSc")
+
+    def test_two_word_cyber_security(self):
+        assert FieldOfStudy.COMPUTER_SCIENCE in classify_fields(
+            "Cyber Security, Privacy and Trust MSc"
+        )
+        assert FieldOfStudy.COMPUTER_SCIENCE in classify_fields("Cybersecurity")
+
+    def test_catalogue_spellings_of_computing(self):
+        for title in (
+            "Computing Science MSc",
+            "Advanced Computing MSc",
+            "Software Systems MSc",
+            "Computational Science and Engineering",
+        ):
+            assert FieldOfStudy.COMPUTER_SCIENCE in classify_fields(title), title
+
+    def test_unrelated_degrees_stay_out(self):
+        for title in (
+            "Advanced Chemical Engineering MSc",
+            "Acoustics and Music Technology MSc",
+            "Architecture",
+            "Civil Engineering",
+            "Veterinary Science",
+            "History of Art",
+        ):
+            assert classify_fields(title) == [], title
+
+
+class TestTitleFirstClassification:
+    def test_page_boilerplate_does_not_override_a_clear_title(self):
+        from app.agent.normalize import classify_fields_titled
+
+        # A law programme page mentioning "data" in its blurb must not become
+        # a data science listing.
+        assert (
+            classify_fields_titled(
+                "European Law LLM",
+                "Our graduates work with data protection regimes and machine learning policy.",
+            )
+            == []
+        )
+
+    def test_body_is_consulted_when_the_title_says_nothing(self):
+        from app.agent.normalize import classify_fields_titled
+
+        assert FieldOfStudy.DATA_SCIENCE in classify_fields_titled(
+            "Programme P-4471",
+            "A taught masters in data science and statistical learning.",
+        )

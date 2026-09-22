@@ -79,6 +79,10 @@ class ChatRequest(BaseModel):
     voice: bool = False
     # Live web search for this turn. Opt-in: it costs roughly 3500x a plain call.
     web: bool = False
+    # Ground the answer in the user's own dossier. On by default — answering
+    # from someone's own documents is the point of the feature, and making
+    # them opt in every time would be a tax on the common case.
+    use_documents: bool = True
     input_mode: str = "text"
     document_ids: list[uuid.UUID] = Field(default_factory=list)
     # Pins the conversation to one posting so every turn has it in context.

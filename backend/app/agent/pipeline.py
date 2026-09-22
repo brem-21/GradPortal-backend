@@ -16,7 +16,7 @@ from app.agent.base import RawOpportunity
 from app.agent.contacts import extract_contacts_from_html
 from app.agent.normalize import (
     classify_degrees,
-    classify_fields,
+    classify_fields_titled,
     classify_funding,
     classify_type,
     clean_text,
@@ -81,7 +81,7 @@ def normalise(raw: RawOpportunity, source: Source) -> dict | None:
     description = clean_text(raw.description, limit=20000)
     blob_head = f"{title} {raw.summary or ''} {description[:4000]}"
 
-    fields = raw.fields_of_study or classify_fields(title, raw.summary, description)
+    fields = raw.fields_of_study or classify_fields_titled(title, raw.summary, description)
     if IN_SCOPE_REQUIRED and not fields:
         return None
 

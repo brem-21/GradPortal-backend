@@ -23,7 +23,7 @@ FIELD_PATTERNS: dict[str, list[str]] = {
         r"\bcomputer vision\b",
         r"\breinforcement learning\b",
         r"\bgenerative ai\b",
-        r"\bllm\b",
+        r"\blarge language model",
         r"\brobotics\b",
     ],
     FieldOfStudy.DATA_SCIENCE: [
@@ -51,18 +51,30 @@ FIELD_PATTERNS: dict[str, list[str]] = {
         r"\bbusiness intelligence\b",
         r"\bbusiness analytics\b",
         r"\bvisual analytics\b",
-        r"\banalytics\b",
+        r"\bpredictive analytics\b",
+        r"\bstatistical analytics\b",
+        # Bare "analytics" is deliberately absent: it tagged finance and
+        # marketing degrees ("Banking Innovation and Risk Analytics") as data
+        # analytics. The qualified forms above carry the actual signal.
     ],
     FieldOfStudy.COMPUTER_SCIENCE: [
-        r"\bcomputer science\b",
+        # Spellings taken from real university course catalogues rather than
+        # invented: "Cyber Security" is two words about as often as one, and
+        # programmes are titled "Computing Science" or "Advanced Computing"
+        # at least as often as "Computer Science".
+        r"\bcomputer scien\w*\b",
+        r"\bcomputing scien\w*\b",
         r"\bcomputing\b",
-        r"\bsoftware engineering\b",
+        r"\bsoftware (engineering|systems|development)\b",
         r"\binformatics\b",
         r"\bcomputer engineering\b",
-        r"\bcybersecurity\b",
-        r"\bhuman.computer interaction\b",
+        r"\bcyber[\s-]?security\b",
+        r"\binformation security\b",
+        r"\bhuman[\s-]?computer interaction\b",
         r"\btheoretical computer science\b",
         r"\balgorithms\b",
+        r"\bdistributed (computing|systems)\b",
+        r"\bcomputational (science|engineering)\b",
     ],
 }
 
@@ -194,6 +206,50 @@ ROLLING = re.compile(
 
 def _matches(text: str, patterns: list[str]) -> bool:
     return any(re.search(p, text, re.IGNORECASE) for p in patterns)
+
+
+# Words that carry no subject information in a course title, so a title made
+# only of these tells us nothing about the field.
+TITLE_STOPWORDS = {
+    "programme", "program", "course", "degree", "masters", "master", "msc",
+    "ma", "ms", "meng", "mres", "mphil", "phd", "llm", "online", "learning",
+    "full", "part", "time", "joint", "advanced", "applied", "international",
+    "and", "the", "of", "in", "for", "with", "study", "studies",
+}
+
+
+def title_is_informative(title: str | None) -> bool:
+    """Whether a title says enough to classify on by itself.
+
+    "European Law LLM" is informative and simply out of scope. "Programme
+    P-4471" is not informative and its page body is worth reading. Treating
+    those the same is what let a law programme's blurb pull it into
+    artificial intelligence.
+    """
+    if not title:
+        return False
+    words = [
+        word
+        for word in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", title.lower())
+        if word not in TITLE_STOPWORDS
+    ]
+    return len(words) >= 1
+
+
+def classify_fields_titled(title: str | None, *body: str | None) -> list[str]:
+    """Classify a listing, trusting its title over its body text.
+
+    A programme page carries menus, faculty blurbs and related-course links, so
+    classifying on the whole page tagged Law LLMs as artificial intelligence
+    and commerce degrees as data science.
+
+    An informative title is therefore authoritative in both directions: what it
+    matches, and what it declines to match. The body is read only when the
+    title is a code or otherwise says nothing.
+    """
+    if title_is_informative(title):
+        return classify_fields(title)
+    return classify_fields(title, *body)
 
 
 def classify_fields(*texts: str | None) -> list[str]:

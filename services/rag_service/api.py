@@ -93,11 +93,15 @@ async def chat(
     # Append so the history the agent reads includes this turn's context.
     conversation.messages.append(user_message)
 
-    outcome = await agent.retrieve(
-        user_key=principal.user_key,
-        question=question,
-        conversation=conversation,
-        user_token=token,
+    outcome = (
+        await agent.retrieve(
+            user_key=principal.user_key,
+            question=question,
+            conversation=conversation,
+            user_token=token,
+        )
+        if payload.use_documents
+        else agent.RetrievalOutcome(has_documents=False)
     )
     assistant_message, hits, web_sources = await agent.answer(
         question=question,
@@ -107,6 +111,7 @@ async def chat(
         voice=payload.voice,
         web=payload.web,
         opportunity=payload.opportunity,
+        use_documents=payload.use_documents,
     )
     db.add(assistant_message)
     db.flush()
@@ -355,13 +360,18 @@ async def chat_stream(
             db.flush()
             conversation.messages.append(user_message)
 
-            yield _sse({"type": "status", "stage": "retrieving"})
-            outcome = await agent.retrieve(
-                user_key=user_key,
-                question=question,
-                conversation=conversation,
-                user_token=token,
-            )
+            if payload.use_documents:
+                yield _sse({"type": "status", "stage": "retrieving"})
+                outcome = await agent.retrieve(
+                    user_key=user_key,
+                    question=question,
+                    conversation=conversation,
+                    user_token=token,
+                )
+            else:
+                # The reader turned the dossier off; skip retrieval entirely
+                # rather than fetching context that will not be used.
+                outcome = agent.RetrievalOutcome(has_documents=False)
 
             messages, hits, grounded = agent.build_messages(
                 question=question,
@@ -370,6 +380,7 @@ async def chat_stream(
                 voice=payload.voice,
                 web=payload.web,
                 opportunity=payload.opportunity,
+                use_documents=payload.use_documents,
             )
 
             # Show the evidence before the prose that rests on it.

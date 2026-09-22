@@ -19,6 +19,7 @@ from rag_service.config import settings
 from rag_service.models import Conversation, Message, Role
 from rag_service.prompts import (
     EMAIL_REFINE,
+    GENERAL_ONLY,
     GROUNDED_ANSWER,
     NO_CONTEXT,
     NO_DOCUMENTS,
@@ -255,6 +256,7 @@ def build_messages(
     voice: bool,
     web: bool = False,
     opportunity: dict | None = None,
+    use_documents: bool = True,
 ) -> tuple[list[dict[str, str]], list[dict], bool]:
     """Returns (messages, citable hits, grounded)."""
     history = _history(conversation, settings.history_turns)
@@ -262,6 +264,20 @@ def build_messages(
     if opportunity:
         context_suffix += OPPORTUNITY_CONTEXT.format(
             opportunity=describe_opportunity(opportunity)
+        )
+
+    # Dossier off: answer generally, and say so rather than implying the
+    # answer came from their documents.
+    if not use_documents:
+        system = (WEB_ONLY if web else GENERAL_ONLY) + context_suffix
+        return (
+            [
+                {"role": "system", "content": system},
+                *history,
+                {"role": "user", "content": question},
+            ],
+            [],
+            False,
         )
 
     # With the web on, thin retrieval is no longer a dead end — the assistant can
@@ -328,6 +344,7 @@ async def answer(
     voice: bool,
     web: bool = False,
     opportunity: dict | None = None,
+    use_documents: bool = True,
 ) -> tuple[Message, list[dict], list]:
     started = time.perf_counter()
     messages, hits, grounded = build_messages(
@@ -337,6 +354,7 @@ async def answer(
         voice=voice,
         web=web,
         opportunity=opportunity,
+        use_documents=use_documents,
     )
 
     result = await llm.chat(
